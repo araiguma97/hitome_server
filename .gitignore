@@ -2,3 +2,4 @@ config.php
 config.py
 json/
 img/
+__pycache__/
