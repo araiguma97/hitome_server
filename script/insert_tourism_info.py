@@ -3,7 +3,7 @@ import os
 import glob
 import json
 
-import config
+from .wikiext import config
 
 def main():
     tourism_info_json_paths = glob.glob('./json/tourism_info_*.json')
