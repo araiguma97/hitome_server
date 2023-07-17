@@ -1,31 +1,47 @@
-import utils
+import sqlite3
 
 from tqdm import tqdm
 
-class CategoriesRepository:
-    def __init__(self, dao):
-        self._dao = dao
+import dao
+import utils
 
+_DATABASE_NAME = "wikicache.db"
+
+class AbstractRepositories:
+    def __init__(self):
+        self._conn = sqlite3.connect(_DATABASE_NAME)
+        self._create_daos()
+
+    def close(self):
+        self._conn.close()
+
+    def _create_daos(self):
+        pass
+
+class CategoriesRepository(AbstractRepositories):
     def update(self, root_category):
-        self._dao.create_tables()
+        self._categories_dao.create_tables()
+        self._category_subcategories_dao.create_tables()
+
         self._search_all_subcategories(root_category)
 
-    def read_category_ids(self):
-        return self._dao.read_category_ids()
+    def _create_daos(self):
+        self._categories_dao = dao.CategoriesDAO(self._conn)
+        self._category_subcategories_dao = dao.CategoriesSubcategoiesDAO(self._conn)
 
     def _search_all_subcategories(self, category):
-        if self._dao.exists_category(category):
+        if self._categories_dao.exists_category(category):
             return
 
         print("Updating " + category["title"])
-        self._dao.update_category(category)
+        self._categories_dao.update_category(category)
 
-        subcategories = self._get_subcategories(category)
+        subcategories = self._get_subcategories_from_wikipedia(category)
         for subcategory in subcategories:
-            self._dao.update_category_subcategory(category, subcategory)
+            self._category_subcategories_dao.update_category_subcategory(category, subcategory)
             self._search_all_subcategories(subcategory)
 
-    def _get_subcategories(self, category):
+    def _get_subcategories_from_wikipedia(self, category):
         params = {
             "action": "query",
             "format": "json",
@@ -34,7 +50,7 @@ class CategoriesRepository:
             "cmpageid": category["category_id"],
             "cmtype": "subcat",
         }
-        for json in utils.request_to_wikipedia_api(params):
+        for json in utils.request_to_wikipedia(params):
             for query_categorymember in json["query"]["categorymembers"]:
                 category = {
                     "category_id": query_categorymember["pageid"],
@@ -42,131 +58,121 @@ class CategoriesRepository:
                 }
                 yield category
 
-class CategoryPagesRepository:
-    def __init__(self, dao):
-        self._dao = dao
+class CategoryPagesRepository(AbstractRepositories):
+    def update(self):
+        self._category_pages_dao.create_tables()
 
-    def update(self, category_ids):
-        self._dao.create_tables()
+        for category_id in self._categories_dao.read_category_ids():
+            for page_id in self._get_page_ids_from_wikipedia(category_id):
+                self._category_pages_dao.update_category_page(category_id, page_id)
 
-        for category_id in tqdm(category_ids, desc="Updating category pages"):
-            params = {
-                "action": "query",
-                "format": "json",
-                "list": "categorymembers",
-                "formatversion": "2",
-                "cmpageid": category_id,
-                "cmtype": "page",
-            }
-            for json in utils.request_to_wikipedia_api(params):
-                for query_categorymember in json["query"]["categorymembers"]:
-                    self._dao.update_category_pages(category_id, query_categorymember["pageid"])
+    def _create_daos(self):
+        self._categories_dao = dao.CategoriesDAO(self._conn)
+        self._category_pages_dao = dao.CategoryPagesDAO(self._conn)
 
-    def read_page_ids(self):
-        return self._dao.read_page_ids()
+    def _get_page_ids_from_wikipedia(self, category_id):
+        params = {
+            "action": "query",
+            "format": "json",
+            "list": "categorymembers",
+            "formatversion": "2",
+            "cmpageid": category_id,
+            "cmtype": "page",
+        }
+        for json in utils.request_to_wikipedia(params):
+           for query_categorymember in json["query"]["categorymembers"]:
+               yield query_categorymember["pageid"]
 
-class PagesRepository:
-    def __init__(self, dao):
-        self._dao = dao
+class PagesRepository(AbstractRepositories):
+    def update(self):
+        self._pages_dao.create_tables()
 
-    def update(self, page_ids):
-        self._dao.create_tables()
+        for page_ids in self._category_pages_dao.read_page_ids(50):
+            for page in self._get_pages_from_wikipedia(page_ids):
+                self._pages_dao.update_page(page)
 
-        for json in self._get_jsons(page_ids):
-            self._update_pages(json)
+    def _create_daos(self):
+        self._category_pages_dao = dao.CategoryPagesDAO(self._conn)
+        self._pages_dao = dao.PagesDAO(self._conn)
 
-    def read_image_titles(self):
-        return self._dao.read_image_titles()
+    def _get_pages_from_wikipedia(self, page_ids):
+        params = {
+            "action": "query",
+            "format": "json",
+            "prop": "coordinates|pageterms|pageprops",
+            "formatversion": "2",
+            "coprimary": "primary",
+            "pageids": "|".join(map(str, page_ids)),
+            "colimit": "50",
+        }
+        for json in utils.request_to_wikipedia(params):
+            for query_page in json["query"]["pages"]:
+                base_url = "https://ja.wikipedia.org/wiki/"
+                try:
+                    page = {
+                        "page_id": query_page["pageid"],
+                        "title": query_page["title"],
+                        "url": base_url + query_page["title"],
+                    }
+                except KeyError:
+                    continue
 
-    def _get_jsons(self, page_ids):
-        jsons = []
+                try:
+                    page["latitude"] = query_page["coordinates"][0]["lat"]
+                    page["longitude"] = query_page["coordinates"][0]["lon"]
+                except KeyError:
+                    pass
 
-        for splited_pageids in tqdm(utils.split_list(page_ids, 50), desc="Updating pages"):
-            params = {
-                "action": "query",
-                "format": "json",
-                "prop": "coordinates|pageterms|pageprops",
-                "formatversion": "2",
-                "coprimary": "primary",
-                "pageids": "|".join(map(str, splited_pageids)),
-                "colimit": "50",
-            }
-            json = utils.request_to_wikipedia_api(params)
-            jsons.extend(json)
+                try:
+                    page["description"] = query_page["terms"]["description"][0]
+                except KeyError:
+                    pass
 
-        return jsons
+                try:
+                    page["image_title"] = query_page["pageprops"]["page_image_free"]
+                except KeyError:
+                    pass
 
-    def _update_pages(self, json):
-        for query_page in json["query"]["pages"]:
-            base_url = "https://ja.wikipedia.org/wiki/"
-            try:
-                page = {
-                    "page_id": query_page["pageid"],
-                    "title": query_page["title"],
-                    "latitude": query_page["coordinates"][0]["lat"],
-                    "longitude": query_page["coordinates"][0]["lon"],
-                    "url": base_url + query_page["title"],
-                }
-            except KeyError:
-                continue
+                yield page
 
-            try:
-                page["description"] = query_page["terms"]["description"][0]
-            except KeyError:
-                pass
+class ImagesRepository(AbstractRepositories):
+    def update(self):
+        self._images_dao.create_tables()
 
-            self._dao.update_page(page)
+        for image_titles in self._pages_dao.read_image_titles(50):
+            for image in self._get_images_from_wikipedia(image_titles):
+                self._images_dao.update_image(image)
 
-            try:
-                image_title = query_page["pageprops"]["page_image_free"]
-            except KeyError:
-                continue
+    def download(self):
+        for image in self._images_dao.read_images():
+           utils.download_image(image)
 
-            self._dao.update_page_image(page, image_title)
+    def _create_daos(self):
+        self._pages_dao = dao.PagesDAO(self._conn)
+        self._images_dao = dao.ImagesDAO(self._conn)
 
-class ImageRepository:
-    def __init__(self, dao):
-        self._dao = dao
+    def _get_images_from_wikipedia(self, image_titles):
+        image_page_titles = ["File:" + image_title for image_title in image_titles]
+        params = {
+            "action": "query",
+            "format": "json",
+            "prop": "imageinfo|pageimages",
+            "titles": "|".join(map(str, image_page_titles)),
+            "formatversion": "2",
+            "iiprop": "extmetadata",
+            "pithumbsize": "50",
+        }
+        for json in utils.request_to_wikipedia(params):
+            for query_page in json["query"]["pages"]:
+                try:
+                    image = {
+                        "image_title": query_page["pageimage"],
+                        "url": query_page["thumbnail"]["source"],
+                        "author": query_page["imageinfo"][0]["extmetadata"]["Artist"]["value"],
+                        "license": query_page["imageinfo"][0]["extmetadata"]["LicenseShortName"]["value"],
+                    }
+                except KeyError:
+                    continue
 
-    def update(self, image_titles):
-        self._dao.create_tables()
-
-        for json in self._get_jsons(image_titles):
-            self._update_images(json)
-
-    def read_images(self):
-        return self._dao.read_images()
-
-    def _get_jsons(self, image_titles):
-        jsons = []
-
-        for splited_image_titles in tqdm(utils.split_list(image_titles, 50), desc="Updating images"):
-            image_page_titles = ["File:" + image_title for image_title in splited_image_titles]
-            params = {
-                "action": "query",
-                "format": "json",
-                "prop": "imageinfo|pageimages",
-                "titles": "|".join(map(str, image_page_titles)),
-                "formatversion": "2",
-                "iiprop": "extmetadata",
-                "pithumbsize": "50",
-            }
-            json = utils.request_to_wikipedia_api(params)
-            jsons.extend(json)
-
-        return jsons
-
-    def _update_images(self, json):
-        for query_page in json["query"]["pages"]:
-            try:
-                image = {
-                    "image_title": query_page["pageimage"],
-                    "url": query_page["thumbnail"]["source"],
-                    "author": query_page["imageinfo"][0]["extmetadata"]["Artist"]["value"],
-                    "license": query_page["imageinfo"][0]["extmetadata"]["LicenseShortName"]["value"],
-                }
-            except KeyError:
-                continue
-
-            self._dao.update_image(image)
+                yield image
 

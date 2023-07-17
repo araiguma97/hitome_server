@@ -1,4 +1,5 @@
-import dao
+from contextlib import closing
+
 import repository
 import utils
 
@@ -9,30 +10,21 @@ def main():
     }
 
     # Categories
-    with dao.CategoriesDAO() as categories_dao:
-        categories_repository = repository.CategoriesRepository(categories_dao)
+    #with closing(repository.CategoriesRepository()) as categories_repository:
         #categories_repository.update(root_category)
-        category_ids = categories_repository.read_category_ids()
 
     # Category pages
-    with dao.CategoryPagesDAO() as category_pages_dao:
-        category_pages_repository = repository.CategoryPagesRepository(category_pages_dao)
-        #category_pages_repository.update(category_ids)
-        page_ids = category_pages_repository.read_page_ids()
+    #with closing(repository.CategoryPagesRepository()) as category_pages_repository:
+        #category_pages_repository.update()
 
     # Pages
-    with dao.PagesDAO() as pages_dao:
-        pages_repository = repository.PagesRepository(pages_dao)
-        #pages_repository.update(page_ids)
-        image_titles = pages_repository.read_image_titles()
+    #with closing(repository.PagesRepository()) as pages_repository:
+        #pages_repository.update()
 
     # Images
-    with dao.ImagesDAO() as images_dao:
-        images_repository = repository.ImageRepository(images_dao)
-        #images_repository.update(image_titles)
-        images = images_repository.read_images()
-
-    utils.download_images(images)
+    with closing(repository.ImagesRepository()) as images_repository:
+        #images_repository.update()
+        images_repository.download()
 
 if __name__ == "__main__":
     main()
