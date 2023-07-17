@@ -102,12 +102,13 @@ class PagesDAO(AbstractDAO):
                     latitude REAL,
                     longitude REAL,
                     description TEXT,
-                    image_title TEXT
+                    image_title TEXT,
+                    text TEXT
                 )
             """)
         self._conn.commit()
 
-    def update_page(self, page):
+    def create_page(self, page):
         with closing(self._conn.cursor()) as cur:
             cur.execute(
                 "INSERT INTO pages (page_id, title, url) VALUES(?, ?, ?)",
@@ -139,12 +140,13 @@ class PagesDAO(AbstractDAO):
                 )
         self._conn.commit()
 
-    def update_page_image(self, page, image_title):
+    def update_page_text(self, page):
         with closing(self._conn.cursor()) as cur:
-            cur.execute(
-                "INSERT INTO page_images (page_id, image_title) VALUES(?, ?)",
-                (page["page_id"], image_title)
-            )
+            if "text" in page:
+                cur.execute(
+                    "UPDATE pages SET text = ? WHERE page_id = ?",
+                    (page["text"], page["page_id"])
+                )
         self._conn.commit()
 
     def read_image_titles(self, n):

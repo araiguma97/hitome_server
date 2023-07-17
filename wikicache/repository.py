@@ -89,18 +89,23 @@ class PagesRepository(AbstractRepository):
         self._pages_dao.create_tables()
 
         for page_ids in self._category_pages_dao.read_page_ids(50):
-            for page in self._get_pages_from_wikipedia(page_ids):
+            for page in self._get_page_from_wikipedia(page_ids):
                 print("Updating " + page["title"])
-                self._pages_dao.update_page(page)
+                self._pages_dao.create_page(page)
 
-    def _get_pages_from_wikipedia(self, page_ids):
+        for page_id in self._category_pages_dao.read_page_ids(1):
+            for page in self._get_page_text_from_wikipedia(page_id):
+                print("Updating " + str(page["page_id"]))
+                self._pages_dao.update_page_text(page)
+
+    def _get_page_from_wikipedia(self, page_ids):
         params = {
             "action": "query",
             "format": "json",
             "prop": "coordinates|pageterms|pageprops",
+            "pageids": "|".join(map(str, page_ids)),
             "formatversion": "2",
             "coprimary": "primary",
-            "pageids": "|".join(map(str, page_ids)),
             "colimit": "50",
         }
         for json in request.request_to_wikipedia(params):
@@ -134,6 +139,28 @@ class PagesRepository(AbstractRepository):
                     page["image_title"] = query_page["pageprops"]["page_image_free"]
                 except KeyError:
                     pass
+
+                yield page
+
+    def _get_page_text_from_wikipedia(self, page_id):
+        params = {
+            "action": "query",
+            "format": "json",
+            "prop": "extracts",
+            "pageids": str(page_id[0]),
+            "formatversion": "2",
+            "exlimit": "1",
+            "explaintext": 1,
+        }
+        for json in request.request_to_wikipedia(params):
+            for query_page in json["query"]["pages"]:
+                try:
+                    page = {
+                        "page_id": query_page["pageid"],
+                        "text": query_page["extract"],
+                    }
+                except KeyError:
+                    continue
 
                 yield page
 
