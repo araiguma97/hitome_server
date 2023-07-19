@@ -39,6 +39,18 @@ class CategoriesDAO(AbstractDAO):
                     break;
                 yield category_id_tuple[0]
 
+    def find_category_by_id(self, category_id):
+        with closing(self._conn.cursor()) as cur:
+            cur.execute("SELECT * FROM categories WHERE category_id = ?", (category_id,))
+            category_tuple = cur.fetchone()
+            if not category_tuple:
+                return None
+            category = {
+                "category_id": category_tuple[0],
+                "title": category_tuple[1],
+            }
+            return category
+
 class CategorySubcategoriesDAO(AbstractDAO):
     def create_tables(self):
         with closing(self._conn.cursor()) as cur:
@@ -89,6 +101,12 @@ class CategoryPagesDAO(AbstractDAO):
                 if not page_id_tuples:
                     break
                 yield [page_id_tuple[0] for page_id_tuple in page_id_tuples]
+
+    def find_category_id_by_page_id(self, page_id):
+        with closing(self._conn.cursor()) as cur:
+            cur.execute("SELECT category_id FROM category_pages WHERE page_id = ?", (page_id,))
+            category_id_tuples = cur.fetchall()
+            return [category_id_tuple[0] for category_id_tuple in category_id_tuples]
 
 class PagesDAO(AbstractDAO):
     def create_tables(self):
@@ -158,6 +176,32 @@ class PagesDAO(AbstractDAO):
                     break
                 yield [image_title_tuple[0] for image_title_tuple in image_title_tuples]
 
+    def read_place_pages(self):
+        with closing(self._conn.cursor()) as cur:
+            cur.execute("""
+                SELECT page_id, title, url, latitude, longitude, description, image_title FROM pages
+                WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+            """)
+            while True:
+                page_tuple = cur.fetchone()
+                if not page_tuple:
+                    break
+                page = {
+                    "page_id": page_tuple[0],
+                    "title": page_tuple[1],
+                    "url": page_tuple[2],
+                    "latitude": page_tuple[3],
+                    "longitude": page_tuple[4],
+                }
+
+                if page_tuple[5]:
+                    page["description"] = page_tuple[5]
+
+                if page_tuple[6]:
+                    page["image_title"] = page_tuple[6]
+
+                yield page
+
 class ImagesDAO(AbstractDAO):
     def create_tables(self):
         with closing(self._conn.cursor()) as cur:
@@ -195,3 +239,16 @@ class ImagesDAO(AbstractDAO):
                 }
                 yield image
 
+    def find_image_by_title(self, image_title):
+        with closing(self._conn.cursor()) as cur:
+            cur.execute("SELECT * FROM images WHERE image_title = ?", (image_title,))
+            image_tuple = cur.fetchone()
+            if not image_tuple:
+                return None
+            image = {
+                "image_title": image_tuple[0],
+                "url": image_tuple[1],
+                "author": image_tuple[2],
+                "license": image_tuple[3],
+            }
+            return image
