@@ -176,7 +176,7 @@ class PagesDAO(AbstractDAO):
                     break
                 yield [image_title_tuple[0] for image_title_tuple in image_title_tuples]
 
-    def read_place_pages(self):
+    def read_spot_pages(self):
         with closing(self._conn.cursor()) as cur:
             cur.execute("""
                 SELECT page_id, title, url, latitude, longitude, description, image_title FROM pages
