@@ -2,3 +2,4 @@ json/
 img/
 __pycache__/
 *.db
+config.py
