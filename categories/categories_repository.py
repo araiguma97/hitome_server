@@ -1,5 +1,6 @@
 from typing import Generator
 
+import utils
 from wiki_data_source import WikiDataSource
 from repository import Repository
 from categories.category import Category
@@ -23,13 +24,13 @@ class CategoriesRepository(Repository):
             yield self._categories_dao.get_category_by_id(category_id)
 
     def _update_categories(self) -> None:
-        root_category = Category(
-            category_id = 364779,
-            title = "Category:群馬県の温泉"
-        )
-
         self._categories_dao.create_tables()
-        self._search_all_subcategories(root_category)
+        for root_category_title in utils.load_json("root_categories.json"):
+            root_category = self._wiki_data_source.get_category_by_title(root_category_title)
+            if root_category is None:
+                print("Root category \"" + root_category_title + "\" is not found")
+                continue
+            self._search_all_subcategories(root_category)
 
     def _search_all_subcategories(self, category: Category) -> None:
         if self._categories_dao.exists_category(category):

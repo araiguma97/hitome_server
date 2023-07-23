@@ -2,20 +2,20 @@ import requests
 import time
 import os
 import re
-import json
 from contextlib import closing
 from typing import Generator, Optional
 
+import utils
 import config
 from categories.categories_repository import CategoriesRepository
 from pages.page import Page
 from pages.pages_repository import PagesRepository
-from images.image import Image
 from images.images_repository import ImagesRepository
+
 
 def main():
     with closing(TourismInfoRetriever()) as tourism_info_retriever:
-        tourism_info_retriever.retrieve(should_update = False)
+        tourism_info_retriever.retrieve()
 
 class TourismInfoRetriever:
     def __init__(self) -> None:
@@ -52,10 +52,10 @@ class TourismInfoRetriever:
             if image is not None:
                 images.append(image)
 
-        self._dump_json(spots,           "spots.json")
-        self._dump_json(spot_categories, "spot_categories.json")
-        self._dump_json(images,          "images.json")
-        self._save_images(images)
+        utils.dump_json(spots,           "spots.json")
+        utils.dump_json(spot_categories, "spot_categories.json")
+        utils.dump_json(images,          "images.json")
+        #self._save_images(images)
 
     def _extract_spot(self, page: Page) -> dict:
         return {
@@ -86,13 +86,6 @@ class TourismInfoRetriever:
             "author": image.author,
             "license": image.license 
         }
-
-    def _dump_json(self, d, file_name):
-        json_dir_path = "./json/"
-        if not os.path.isdir(json_dir_path):
-            os.mkdir(json_dir_path)
-        with open(json_dir_path + file_name, "w") as f:
-            json.dump(d, f, ensure_ascii=False, indent=4)
 
     def _save_images(self, images: list[dict]):
         image_dir_path = "./img/"
