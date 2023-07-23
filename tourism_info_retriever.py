@@ -52,10 +52,10 @@ class TourismInfoRetriever:
             if image is not None:
                 images.append(image)
 
-        utils.dump_json(spots,           "spots.json")
-        utils.dump_json(spot_categories, "spot_categories.json")
-        utils.dump_json(images,          "images.json")
-        #self._save_images(images)
+        utils.dump_json("output", spots,           "spots.json")
+        utils.dump_json("output", spot_categories, "spot_categories.json")
+        utils.dump_json("output", images,          "images.json")
+        self._save_images(images)
 
     def _extract_spot(self, page: Page) -> dict:
         return {

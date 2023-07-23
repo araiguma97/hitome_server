@@ -27,7 +27,7 @@ class CategoriesRepository(Repository):
     def _update_categories(self) -> None:
         self._categories_dao.create_tables()
 
-        for root_category_title in utils.load_json("root_categories.json"):
+        for root_category_title in utils.load_json("config", "root_categories.json"):
             root_category = self._wiki_data_source.get_category_by_title(root_category_title)
             if root_category is None:
                 print("Root category \"" + root_category_title + "\" is not found")
@@ -50,10 +50,16 @@ class CategoriesRepository(Repository):
             self._search_all_subcategories(subcategory)
     
     def _should_exclude_category(self, category: Category) -> bool:
-        for exclude_category_pattern in utils.load_json("exclude_categories.json"):
+        json = utils.load_json("config", "category_filter.json")
+        for exclude_category_pattern in json["exclude"]:
             if re.match(exclude_category_pattern, category.title):
                 return True
-        return False
+        
+        for include_category_pattern in json["include"]:
+            if re.match(include_category_pattern, category.title):
+                return False
+        
+        return True
 
     def _update_category_pages(self) -> None:
         self._category_pages_dao.create_tables()
