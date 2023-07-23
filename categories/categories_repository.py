@@ -1,4 +1,5 @@
 from typing import Generator
+import re
 
 import utils
 from wiki_data_source import WikiDataSource
@@ -25,6 +26,7 @@ class CategoriesRepository(Repository):
 
     def _update_categories(self) -> None:
         self._categories_dao.create_tables()
+
         for root_category_title in utils.load_json("root_categories.json"):
             root_category = self._wiki_data_source.get_category_by_title(root_category_title)
             if root_category is None:
@@ -36,6 +38,10 @@ class CategoriesRepository(Repository):
         if self._categories_dao.exists_category(category):
             return
 
+        if self._should_exclude_category(category):
+            print("Excluded category \"" + category.title + "\"")
+            return
+
         print("Updating category \"" + category.title + "\"")
         self._categories_dao.insert_category(category)
 
@@ -43,6 +49,12 @@ class CategoriesRepository(Repository):
         for subcategory in subcategories:
             self._search_all_subcategories(subcategory)
     
+    def _should_exclude_category(self, category: Category) -> bool:
+        for exclude_category_pattern in utils.load_json("exclude_categories.json"):
+            if re.match(exclude_category_pattern, category.title):
+                return True
+        return False
+
     def _update_category_pages(self) -> None:
         self._category_pages_dao.create_tables()
 
