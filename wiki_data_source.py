@@ -68,12 +68,12 @@ class WikiDataSource:
         }
         for json in self._request_to_wikipedia(params):
             for query_page in json["query"]["pages"]:
-                base_url = "https://ja.wikipedia.org/wiki/"
+                base_url = "https://ja.wikipedia.org/?curid="
                 try:
                     page = Page(
                         page_id = query_page["pageid"],
                         title = query_page["title"],
-                        source = base_url + query_page["title"],
+                        source = base_url + str(query_page["pageid"]),
                         latitude = query_page.get("coordinates", [{}])[0].get("lat"),
                         longitude = query_page.get("coordinates", [{}])[0].get("lon"),
                         description = query_page.get("terms", {}).get("description", [""])[0],
