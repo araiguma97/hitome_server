@@ -1,4 +1,4 @@
-from typing import Any, Generator
+from typing import Any, Generator, Optional
 import requests
 import time
 
@@ -9,6 +9,23 @@ from pages.page import Page
 
 
 class WikiDataSource:
+    def get_category_by_title(self, title: str) -> Optional[Category]:
+        params = {
+            "action": "query",
+            "format": "json",
+            "titles": title,
+            "formatversion": "2"
+        }
+        json = self._request_to_wikipedia(params).__next__()
+        try:
+            return Category(
+                category_id = json["query"]["pages"][0]["pageid"],
+                title       = json["query"]["pages"][0]["title"],
+            )
+        except KeyError:
+            return None
+        except ValueError:
+            return None
 
     def get_subcategories(self, category: Category) -> Generator[Category, None, None]:
         params = {
@@ -23,7 +40,7 @@ class WikiDataSource:
             for query_categorymember in json["query"]["categorymembers"]:
                 yield Category(
                     category_id = query_categorymember["pageid"],
-                    title = query_categorymember["title"]
+                    title       = query_categorymember["title"]
                 )
 
     def get_page_id(self, category_id: int) -> Generator[int, None, None]:
@@ -101,12 +118,11 @@ class WikiDataSource:
         }
         json = self._request_to_wikipedia(params).__next__()
         try:
-            text = json["query"]["pages"][0]["extract"]
+            return json["query"]["pages"][0]["extract"]
         except KeyError:
-            text = ""
+            return ""
         except ValueError:
-            text = ""
-        return text
+            return ""
 
     def _request_to_wikipedia(self, params: dict[Any, Any]) -> Generator[Any, None, None]:
         wikipedia_url = "https://ja.wikipedia.org/w/api.php"

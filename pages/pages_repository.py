@@ -17,7 +17,7 @@ class PagesRepository(Repository):
 
     def update(self) -> None:
         self._update_pages()
-        self._update_texts()
+        #self._update_texts()
 
     def get(self) -> Generator[Page, None, None]:
         return self._pages_dao.get_pages()
