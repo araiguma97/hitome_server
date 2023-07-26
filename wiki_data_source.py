@@ -92,7 +92,7 @@ class WikiDataSource:
             "titles": "|".join(["File:" + image_title for image_title in image_titles]),
             "formatversion": "2",
             "iiprop": "extmetadata",
-            "pithumbsize": "50",
+            "pithumbsize": "300",
         }
         for json in self._request_to_wikipedia(params):
             for query_page in json["query"]["pages"]:

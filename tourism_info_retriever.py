@@ -15,7 +15,7 @@ from images.images_repository import ImagesRepository
 
 def main():
     with closing(TourismInfoRetriever()) as tourism_info_retriever:
-        tourism_info_retriever.retrieve()
+        tourism_info_retriever.retrieve(should_update = False)
 
 class TourismInfoRetriever:
     def __init__(self) -> None:
@@ -89,9 +89,15 @@ class TourismInfoRetriever:
 
     def _save_images(self, images: list[dict]):
         image_dir_path = "./img/"
-        sleep_sec = 5
+        sleep_sec = 10
 
         for image in images:
+            image_file_path = image_dir_path + image["image_title"]
+
+            if os.path.isfile(image_file_path):
+                print("Canceled downloading image \"" + image["image_title"] + "\"")
+                continue
+
             print("Downloading image \"" + image["image_title"] + "\"")
 
             response = requests.get(image["source"], headers = config.headers)
@@ -100,7 +106,7 @@ class TourismInfoRetriever:
 
             if not os.path.isdir(image_dir_path):
                 os.mkdir(image_dir_path)
-            with open(image_dir_path + image["image_title"], "wb") as f:
+            with open(image_file_path, "wb") as f:
                 f.write(response.content)
 
 if __name__ == "__main__":
