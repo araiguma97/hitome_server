@@ -2,7 +2,7 @@ from typing import Any, Generator, Optional
 import requests
 import time
 
-import config
+from config import config
 from categories.category import Category
 from images.image import Image
 from pages.page import Page

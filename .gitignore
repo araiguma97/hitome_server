@@ -1,5 +1,4 @@
-output/
 img/
 __pycache__/
-*.db
 config.py
+.venv
